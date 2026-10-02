@@ -1,0 +1,29 @@
+[
+  {
+    "id": "mission-7",
+    "mission": 7,
+    "title": "The Lost Sock",
+    "level": "B",
+    "text": "Milo the cat had a big problem. His favourite red sock was gone! He looked under the bed. He looked behind the door. He even looked inside the fridge, which was very cold. Then Milo heard a tiny squeak. A mouse was sleeping in the sock, snoring like a little train.",
+    "reactions": {
+      "0": "Uh-oh, a big problem!",
+      "1": "Oh no, not the red sock!",
+      "3": "Not behind the door either...",
+      "4": "A cat in the fridge?! Keep going...",
+      "5": "A squeak? Who could that be?",
+      "6": "Ha! A snoring mouse!"
+    }
+  },
+  {
+    "id": "mission-8",
+    "mission": 8,
+    "title": "Rain Day",
+    "level": "B",
+    "text": "It was raining on Saturday. Ava could not go to the park. She sat by the window and watched the drops race down the glass. Her dad made pancakes with blueberries. Then they built a big blanket fort in the lounge room. It was the best rainy day ever.",
+    "reactions": {
+      "1": "Oh no, no park today!",
+      "3": "Pancakes! Yum!",
+      "4": "A blanket fort? So cool!"
+    }
+  }
+]

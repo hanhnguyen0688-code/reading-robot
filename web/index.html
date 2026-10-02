@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading Robot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#14152a; --bg1:#2a2b6b; --ray:rgba(255,255,255,.035);
+  --panel:#2f3038; --panel2:#24252c; --line:rgba(255,255,255,.08);
+  --ink:#f3f2fb; --ink-dim:#8d8ca6; --ink-faint:#5d5c74;
+  --violet:#a99cf5; --violet2:#8b7cf0; --violet-deep:#6d5fd6; --lav:#e6e3fb;
+  --bubble:#eceaf8; --bubble-ink:#16151f; --warn:#c7b8ff; --err:#ff9fb2;
+}
+:root[data-theme="light"]{ --bg0:#dfe0f3; --bg1:#b9b6ec; --panel:#ffffff; --panel2:#f1f0f8; --ink:#1d1c2b; --ink-dim:#5e5c78; --ink-faint:#a3a1bb; --line:rgba(0,0,0,.08); --ray:rgba(255,255,255,.25);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0d0d18;color:var(--ink);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+
+/* ---------- fixed 1920x1240 robot screen, scaled to fit ---------- */
+#viewport{position:fixed;inset:0}
+body.demo #stage{top:calc(50% - 30px)}
+#stage{width:1920px;height:1240px;position:absolute;left:50%;top:50%;border-radius:48px;overflow:hidden;transform-origin:center;
+  background:radial-gradient(ellipse at 30% 35%,#3a3b8c 0%,var(--bg1) 30%,var(--bg0) 75%);box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#stage::before{content:"";position:absolute;inset:-50%;background:repeating-conic-gradient(from 0deg at 50% 50%,var(--ray) 0 6deg,transparent 6deg 14deg);
+  animation:spin 120s linear infinite;pointer-events:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.screen{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .45s ease}
+.screen.on{opacity:1;pointer-events:auto}
+
+.pill{display:inline-flex;align-items:center;gap:18px;background:var(--panel);border-radius:40px;padding:16px 30px;
+  box-shadow:0 8px 0 rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06);font-weight:700;font-size:34px}
+.ico{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#c6bcff,#8f80ee);color:#1b1640;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.18)}
+.ico svg{width:30px;height:30px}
+.sq-ico{width:96px;height:96px;border-radius:26px;display:grid;place-items:center;background:linear-gradient(180deg,#c9c0ff,#8d7ef0);color:#1b1640;
+  box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),0 6px 0 rgba(0,0,0,.25)}
+.sq-ico svg{width:48px;height:48px}
+
+/* ---------- robot (pure CSS) ---------- */
+.robot{position:absolute;width:660px;height:700px}
+.robot .ant{position:absolute;left:50%;top:0;transform:translateX(-50%);width:16px;height:110px;background:#5b5d6c;border-radius:8px}
+.robot .ant::before{content:"";position:absolute;left:50%;top:-36px;transform:translateX(-50%);width:62px;height:62px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff,#b9adff 45%,#7c6de6);box-shadow:0 0 40px rgba(169,156,245,.7)}
+.robot .head{position:absolute;top:100px;left:50px;width:560px;height:420px;border-radius:200px;background:linear-gradient(180deg,#8c8e9e,#55576a);
+  box-shadow:inset 0 -18px 0 rgba(0,0,0,.25),inset 0 8px 0 rgba(255,255,255,.18),0 30px 50px rgba(0,0,0,.35)}
+.robot .ear{position:absolute;top:210px;width:70px;height:180px;border-radius:40px;background:linear-gradient(180deg,#6b6d7c,#4b4d5c)}
+.robot .ear.l{left:0}.robot .ear.r{right:0}
+.robot .face{position:absolute;inset:56px 56px 70px;border-radius:150px;background:radial-gradient(ellipse at 50% 40%,#2b2a3a,#16151f);overflow:hidden}
+.robot .eye{position:absolute;top:34px;width:84px;height:122px;border-radius:44px;background:linear-gradient(180deg,#ece8ff,#a99cf5);
+  box-shadow:0 0 50px rgba(169,156,245,.55);transition:height .2s,top .2s}
+.robot .eye::after{content:"";position:absolute;top:16px;left:18px;width:24px;height:24px;border-radius:50%;background:#fff}
+.robot .eye.l{left:88px}.robot .eye.r{right:88px}
+.robot .blush{position:absolute;top:130px;width:90px;height:28px;border-radius:50%;background:rgba(169,156,245,.35);filter:blur(4px)}
+.robot .blush.l{left:44px}.robot .blush.r{right:44px}
+.robot .mouth{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);width:150px;height:70px;border:12px solid #c9c0ff;border-top:0;
+  border-radius:0 0 90px 90px;box-shadow:0 8px 20px rgba(169,156,245,.35);transition:all .25s}
+.robot .body{position:absolute;left:50%;transform:translateX(-50%);top:540px;width:280px;height:120px;border-radius:40px 40px 50px 50px;
+  background:linear-gradient(180deg,#6f7181,#4a4c5a);box-shadow:inset 0 6px 0 rgba(255,255,255,.12),0 20px 30px rgba(0,0,0,.3);display:flex;gap:22px;justify-content:center;align-items:center}
+.robot .body i{width:28px;height:28px;border-radius:50%;background:#8d8f9e}
+.robot .body i.on{background:#b5a9ff;box-shadow:0 0 14px #a99cf5}
+.robot.talking .mouth{height:46px;width:110px;border-radius:0 0 60px 60px;animation:talk .28s infinite alternate}
+@keyframes talk{to{height:22px}}
+.robot.listening .eye{animation:listen 1.8s ease-in-out infinite}
+@keyframes listen{50%{transform:scaleY(.86) translateY(6px)}}
+.robot.blink .eye{animation:blink 4.5s infinite}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+.robot.sleep .eye{height:14px;top:96px;border-radius:10px;box-shadow:none}
+.robot.sleep .eye::after{display:none}
+.robot.sleep .mouth{width:70px;height:20px;border-width:10px}
+.sparkle{position:absolute;color:#c4baff;filter:drop-shadow(0 0 8px rgba(169,156,245,.6));animation:twinkle 3s ease-in-out infinite}
+@keyframes twinkle{50%{transform:scale(.75) rotate(15deg);opacity:.7}}
+
+.bubble{background:var(--bubble);color:var(--bubble-ink);border-radius:56px;box-shadow:0 14px 0 rgba(160,155,200,.55),0 30px 60px rgba(0,0,0,.3);position:relative}
+
+/* ---------- 3a greet ---------- */
+#greet .brand{position:absolute;left:66px;top:66px}
+#greet .seen{position:absolute;right:56px;top:42px;display:flex;align-items:center;gap:28px;background:var(--panel);border-radius:44px;padding:14px 40px 14px 14px;
+  box-shadow:0 10px 0 rgba(0,0,0,.25)}
+.cam{width:176px;height:114px;border-radius:30px;background:#26272d;display:grid;place-items:center;position:relative;overflow:hidden}
+.cam .dot{position:absolute;left:14px;top:12px;width:14px;height:14px;border-radius:50%;background:#e2ddff;animation:rec 1.4s infinite}
+@keyframes rec{50%{opacity:.25}}
+.cam .av{width:86px;height:86px;border-radius:20px;border:4px solid #b1a6ff;display:grid;place-items:center;color:#9c9cb0}
+.seen small{display:block;font-weight:700;letter-spacing:3px;font-size:22px;color:var(--ink-dim);margin-bottom:8px}
+.seen b{font-size:38px}
+#greet .robot{left:70px;top:360px}
+#greet .bubble{position:absolute;left:770px;top:330px;width:1080px;padding:70px 70px 60px;transform:rotate(-1.2deg)}
+#greet .bubble::before{content:"";position:absolute;left:-40px;top:150px;border:34px solid transparent;border-right:46px solid var(--bubble);border-left:0}
+#greet h1{font-size:118px;font-weight:900;letter-spacing:-3px;line-height:1}
+#greet .bubble p{font-size:46px;font-weight:600;margin-top:28px;color:#2d2b3c}
+#greet .lead{position:absolute;left:768px;top:756px;font-weight:800;letter-spacing:3px;font-size:26px;color:var(--violet)}
+#greet .acts{position:absolute;left:766px;top:808px;display:flex;align-items:center;gap:22px}
+.act{display:flex;align-items:center;gap:26px;background:var(--panel2);border:4px solid var(--violet2);border-radius:44px;padding:20px 40px 20px 22px;
+  box-shadow:0 0 0 6px rgba(139,124,240,.15),0 10px 0 rgba(0,0,0,.3);transition:transform .15s}
+.act:active{transform:translateY(4px)}
+.act span{font-size:32px;font-weight:700;color:#d9d6ee;text-align:left;line-height:1.1}
+.act b{display:block;font-size:52px;font-weight:800;color:var(--ink)}
+.act .wave{display:flex;gap:7px;align-items:center;margin-left:14px}
+.act .wave i{width:8px;border-radius:4px;background:#b7acff;animation:wv 1s ease-in-out infinite}
+@keyframes wv{50%{transform:scaleY(.4)}}
+.or{width:76px;height:76px;border-radius:50%;background:#4a4b58;display:grid;place-items:center;font-size:30px;font-weight:700;color:#d6d4e4}
+#greet .notme{position:absolute;left:768px;top:972px;font-size:30px;color:#a9a8c4}
+#greet .chips{position:absolute;left:768px;top:1066px;display:flex;gap:22px}
+#greet .chips .pill{font-size:34px;padding:12px 28px 12px 14px}
+
+/* ---------- 3b / 3c reading ---------- */
+.topbar{position:absolute;left:56px;right:56px;top:42px;display:flex;align-items:center;gap:22px}
+.devs{display:flex;align-items:center;gap:18px;background:var(--panel);border-radius:40px;padding:22px 30px;box-shadow:0 8px 0 rgba(0,0,0,.25)}
+.devs i{width:16px;height:16px;border-radius:50%;background:#e8e4ff}
+.devs i.live{animation:rec 1.4s infinite}
+.devs svg{width:30px;height:30px}
+.mission{font-size:34px}.mission em{font-style:normal;color:var(--violet)}
+.stars-pill{margin-left:auto}
+.track{flex:1;height:30px;border-radius:15px;background:#1e1f26;position:relative;margin:0 20px;box-shadow:inset 0 3px 6px rgba(0,0,0,.5)}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:15px;background:linear-gradient(90deg,#b4a8ff,#9f92f7);transition:width .5s ease}
+.track .cp{position:absolute;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:#55566a;display:grid;place-items:center;color:#8c8ca4;transition:all .3s}
+.track .cp.done{background:#e9e5ff;color:#2a2360;box-shadow:0 0 16px rgba(169,156,245,.7)}
+.track .cp svg{width:24px;height:24px}
+.track .bot{position:absolute;top:50%;width:92px;height:76px;margin:-38px 0 0 -46px;border-radius:30px;background:linear-gradient(180deg,#9799a8,#686a7a);
+  display:flex;gap:14px;justify-content:center;align-items:center;transition:left .5s ease;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+.track .bot i{width:16px;height:26px;border-radius:9px;background:#efecff}
+.trophy{width:78px;height:78px;border-radius:24px;background:#4c4d5c;display:grid;place-items:center;color:#e6e2ff;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+.trophy svg{width:42px;height:42px}
+.trophy.won{background:linear-gradient(180deg,#d6ceff,#9d90f4);color:#2a2360}
+
+.passage{position:absolute;left:60px;top:226px;width:1330px;height:970px;border-radius:60px;background:linear-gradient(180deg,#3a3b44,#2a2b32);
+  box-shadow:0 22px 0 rgba(0,0,0,.25),inset 0 2px 0 rgba(255,255,255,.05);padding:84px 80px}
+.passage .lvl{position:absolute;left:66px;top:-36px;background:linear-gradient(180deg,#b9aeff,#8c7def);color:#fff;font-weight:800;letter-spacing:3px;font-size:28px;
+  border-radius:30px;padding:18px 34px;box-shadow:0 8px 0 rgba(70,55,170,.5)}
+.passage .txt{font-size:62px;font-weight:500;line-height:1.58;color:var(--ink);letter-spacing:-.3px}
+.w{position:relative;display:inline-block;padding:0 .02em;border-radius:18px;transition:color .3s,background .3s}
+.reading .w.p{color:#6f6e84}
+.w.cur{background:linear-gradient(180deg,#b3a7ff,#8b7cf0);color:#fff !important;transition:none;font-weight:800;padding:0 18px;margin:0 -2px;transform:rotate(-1.5deg) scale(1.06);
+  box-shadow:0 8px 0 rgba(70,55,170,.55),0 0 30px rgba(169,156,245,.5)}
+.marks-on .w.mw,.marks-on .w.ms,.marks-on .w.mo,.w.mt{text-decoration:underline wavy;text-decoration-thickness:4px;text-underline-offset:14px}
+.marks-on .w.mw{text-decoration-color:var(--warn)}
+.marks-on .w.ms,.marks-on .w.mo{text-decoration-color:var(--err)}
+.marks-on .w.mo{opacity:.6}
+.w.mt{text-decoration-color:#7fe0c4}
+.side{position:absolute;right:56px;width:380px}
+.say{position:absolute;right:58px;top:344px;width:430px;padding:40px 36px;font-size:36px;font-weight:700;text-align:center;line-height:1.3;border-radius:44px;transform:rotate(1.5deg)}
+.say::after{content:"";position:absolute;left:50%;bottom:-36px;transform:translateX(-50%);border:24px solid transparent;border-top:30px solid var(--bubble);border-bottom:0}
+.orb{position:absolute;right:104px;top:710px;width:340px;height:340px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle,#b1a5ff 0%,#8b7cf0 58%,rgba(139,124,240,.25) 60%,rgba(139,124,240,.08) 72%,transparent 73%)}
+.orb.pulse{animation:orb 1.6s ease-in-out infinite}
+@keyframes orb{50%{transform:scale(1.05)}}
+.orb .in{text-align:center;color:#fff;font-weight:800;font-size:34px;letter-spacing:1px}
+.orb .in .e{width:90px;height:90px;border-radius:50%;background:#fff;color:#6d5fd6;display:grid;place-items:center;margin:0 auto 18px}
+.orb .in .e svg{width:52px;height:52px}
+.meter{position:absolute;right:56px;top:228px;width:376px;height:418px;border-radius:50px;background:linear-gradient(180deg,#34353d,#2a2b31);
+  box-shadow:0 14px 0 rgba(0,0,0,.25);text-align:center;padding-top:34px}
+.meter small{font-weight:800;letter-spacing:3px;font-size:22px;color:#b2b0c8}
+.meter svg{display:block;margin:20px auto 0}
+.meter b{display:block;font-size:40px;margin-top:6px}
+.comment{position:absolute;right:56px;top:672px;width:376px;padding:30px 30px;font-size:31px;font-weight:700;line-height:1.3;border-radius:40px;transform:rotate(-1.4deg);transition:opacity .3s}
+.help{position:absolute;right:56px;top:840px;width:376px;display:flex;align-items:center;gap:16px;background:var(--panel);border-radius:36px;padding:24px 26px;
+  font-size:30px;font-weight:700;white-space:nowrap;box-shadow:0 10px 0 rgba(0,0,0,.25)}
+.help .ico{width:44px;height:44px}.help .ico svg{width:24px;height:24px}
+.toast{position:absolute;left:920px;top:178px;background:linear-gradient(180deg,#bdb3ff,#9a8cf5);color:#fff;font-size:34px;font-weight:800;border-radius:34px;
+  padding:22px 36px;display:flex;gap:16px;align-items:center;box-shadow:0 10px 0 rgba(70,55,170,.5);transform:rotate(2deg) scale(.6);opacity:0;transition:all .35s cubic-bezier(.3,1.6,.6,1);z-index:5}
+.toast.show{opacity:1;transform:rotate(2deg) scale(1)}
+.toast svg{width:34px;height:34px}
+
+/* ---------- 3d finish ---------- */
+#finish .stars{position:absolute;left:50%;top:120px;transform:translateX(-50%);display:flex;align-items:flex-end;gap:10px}
+.bigstar{width:180px;height:180px;color:#e9e5ff;filter:drop-shadow(0 12px 0 rgba(110,95,214,.6)) drop-shadow(0 0 40px rgba(169,156,245,.6));
+  transform:scale(0);transition:transform .5s cubic-bezier(.3,1.7,.5,1)}
+.bigstar.mid{width:230px;height:230px}
+.bigstar.dim{color:#4b4c63;filter:drop-shadow(0 12px 0 rgba(0,0,0,.3))}
+#finish.pop .bigstar{transform:scale(1) rotate(var(--r,0deg))}
+#finish .banner{position:absolute;left:50%;top:342px;transform:translateX(-50%) rotate(-1.5deg);background:linear-gradient(180deg,#bdb2ff,#9284f2);padding:30px 70px;
+  border-radius:44px;box-shadow:0 16px 0 rgba(70,55,170,.55);font-size:104px;font-weight:900;color:#fff;letter-spacing:-2px;white-space:nowrap}
+#finish .msg{position:absolute;left:50%;top:556px;transform:translateX(-50%);width:1100px;text-align:center;font-size:42px;font-weight:600;line-height:1.38;color:#e8e6f8}
+#finish .tiles{position:absolute;left:50%;top:760px;transform:translateX(-50%);display:flex;gap:30px;width:max-content;white-space:nowrap}
+.tile{display:flex;align-items:center;gap:24px;background:linear-gradient(180deg,#3a3b44,#2b2c33);border-radius:40px;padding:30px 44px 30px 26px;box-shadow:0 12px 0 rgba(0,0,0,.28)}
+.tile small{display:block;font-weight:800;letter-spacing:3px;font-size:22px;color:#b6b4cc}
+.tile b{font-size:48px}
+.tile .sq-ico{width:78px;height:78px;border-radius:22px}.tile .sq-ico svg{width:38px;height:38px}
+#finish .endrow{position:absolute;left:50%;top:962px;transform:translateX(-50%);display:flex;align-items:center;gap:40px;width:max-content}
+#finish .nap{display:flex;align-items:center;gap:22px;font-size:32px;font-weight:700;color:#bdb6f2}
+.ring{width:76px;height:76px;position:relative}
+.ring svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:30px}
+
+/* ---------- other screens ---------- */
+.center-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
+#sleep .robot,#notme .robot{position:relative;margin:0 auto}
+#sleep .zz{position:absolute;left:1140px;top:300px;font-size:90px;font-weight:900;color:#b9aeff;animation:zz 2.4s ease-in-out infinite}
+@keyframes zz{50%{transform:translate(20px,-30px);opacity:.4}}
+#start .card{width:1000px;padding:70px;border-radius:60px;background:linear-gradient(180deg,#34353e,#26272d);box-shadow:0 24px 0 rgba(0,0,0,.3);text-align:center}
+#start h2{font-size:72px;font-weight:900;letter-spacing:-1px}
+#start p{font-size:32px;color:#b9b7d0;margin:18px 0 40px;line-height:1.4}
+.roster{display:flex;flex-wrap:wrap;gap:24px;justify-content:center}
+.roster .act{border-width:3px}
+.btn{display:inline-flex;gap:16px;align-items:center;background:linear-gradient(180deg,#b9aeff,#8c7def);color:#fff;font-size:40px;font-weight:800;padding:26px 52px;border-radius:40px;box-shadow:0 10px 0 rgba(70,55,170,.55)}
+.btn.ghost{background:var(--panel);color:var(--ink);box-shadow:0 10px 0 rgba(0,0,0,.3)}
+.err{color:var(--err);font-size:28px;margin-top:24px;min-height:34px}
+
+/* ---------- demo control bar (outside the robot screen) ---------- */
+#demo{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:none;gap:10px;align-items:center;background:rgba(20,20,36,.9);
+  border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(8px);padding:8px 12px;border-radius:14px;font-size:13px;color:#cfcde6;z-index:20;flex-wrap:nowrap;white-space:nowrap;justify-content:center;max-width:calc(100vw - 16px);overflow-x:auto}
+#demo.on{display:flex}
+#demo button{background:#34345a;border-radius:8px;padding:6px 12px;font-weight:600}
+#demo button.on{background:#7d6ff0;color:#fff}
+#demo label{display:flex;gap:6px;align-items:center}
+@media (max-width:640px){#demo{left:8px;right:8px;transform:none;max-width:none;gap:6px;flex-wrap:wrap;white-space:normal;overflow:visible;padding:6px 8px;bottom:calc(8px + env(safe-area-inset-bottom,0px))}#demo #demoInfo,#demo>b{display:none}#demo button{padding:6px 9px}#demo label{gap:4px}}
+#log{position:fixed;right:14px;top:14px;width:330px;max-height:40vh;overflow:auto;font:12px/1.4 ui-monospace,monospace;background:rgba(15,15,28,.92);color:#bdbbd6;
+  border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px;display:none;z-index:20}
+#log.on{display:block}
+
+/* ================= PORTRAIT (phones held upright): 1080x1920 canvas ================= */
+#stage.portrait{width:1080px;height:1920px;border-radius:40px}
+#stage.portrait #greet .brand{left:40px;top:44px}
+#stage.portrait #greet .seen{left:40px;right:40px;top:150px;padding-right:30px}
+#stage.portrait #greet .robot{left:342px;top:330px;transform:scale(.6);transform-origin:top left}
+#stage.portrait #greet .bubble{left:40px;top:790px;width:1000px;padding:56px 56px 50px;transform:rotate(-1deg)}
+#stage.portrait #greet .bubble::before{left:50%;top:-40px;transform:translateX(-50%);border:34px solid transparent;border-bottom:46px solid var(--bubble);border-top:0}
+#stage.portrait #greet h1{font-size:104px}
+#stage.portrait #greet .bubble p{font-size:42px}
+#stage.portrait #greet .lead{left:40px;top:1180px}
+#stage.portrait #greet .acts{left:40px;right:40px;top:1230px;flex-direction:column;align-items:stretch;gap:16px}
+#stage.portrait #greet .acts .or{align-self:center;width:64px;height:64px;font-size:26px}
+#stage.portrait #greet .notme{left:40px;top:1690px}
+#stage.portrait #greet .chips{left:40px;top:1770px}
+#stage.portrait #greet .sparkle{display:none}
+
+#stage.portrait .topbar{left:30px;right:30px;top:36px;gap:14px}
+#stage.portrait .devs{padding:20px 22px;gap:12px}
+#stage.portrait .mission{font-size:30px}
+#stage.portrait .track{margin:0 8px}
+#stage.portrait .passage{left:30px;top:200px;width:1020px;height:1100px;padding:80px 60px}
+#stage.portrait .passage .txt{font-size:58px;line-height:1.6}
+#stage.portrait .say{left:30px;right:auto;top:1380px;width:600px;transform:rotate(-1deg)}
+#stage.portrait .say::after{left:auto;right:-34px;bottom:auto;top:50%;transform:translateY(-50%);border:24px solid transparent;border-left:34px solid var(--bubble);border-right:0}
+#stage.portrait .orb{right:40px;top:1360px;width:330px;height:330px}
+#stage.portrait .meter{left:30px;right:auto;top:1360px;width:470px;height:420px}
+#stage.portrait .comment{right:30px;top:1370px;width:500px}
+#stage.portrait .help{right:30px;top:1640px;width:500px;justify-content:center}
+#stage.portrait .toast{left:auto;right:40px;top:160px}
+
+#stage.portrait #finish .stars{top:160px}
+#stage.portrait #finish .banner{top:420px;font-size:84px;padding:26px 50px;white-space:normal;text-align:center;width:max-content;max-width:980px}
+#stage.portrait #finish .msg{top:640px;width:940px;font-size:40px}
+#stage.portrait #finish .tiles{top:900px;flex-direction:column;gap:22px}
+#stage.portrait #finish .tile{width:640px}
+#stage.portrait #finish .endrow{top:1500px;flex-direction:column;gap:36px}
+#stage.portrait #finish .sparkle{display:none}
+#stage.portrait #notme .bubble{max-width:900px}
+#stage.portrait #start .card{width:940px}
+#stage.portrait #sleep .zz{left:700px;top:600px}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+
+  <!-- ============ start / kiosk ============ -->
+  <section class="screen on" id="start">
+    <div class="center-msg card">
+      <h2>Reading Robot</h2>
+      <p id="startHint">Who is reading today?</p>
+      <div class="roster" id="roster"></div>
+      <div class="err" id="startErr"></div>
+    </div>
+  </section>
+
+  <!-- ============ 3a greet ============ -->
+  <section class="screen" id="greet">
+    <div class="pill brand"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="13" rx="4"/><rect x="11" y="2" width="2" height="4"/><circle cx="9" cy="12" r="1.6" fill="#c6bcff"/><circle cx="15" cy="12" r="1.6" fill="#c6bcff"/><rect x="9" y="15" width="6" height="1.6" rx=".8" fill="#c6bcff"/></svg></span>Reading Robot</div>
+    <svg class="sparkle" style="left:132px;top:206px;width:46px" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z"/></svg>
+    <svg class="sparkle" style="left:850px;top:236px;width:64px;animation-delay:-1s" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg>
+    <svg class="sparkle" style="left:190px;top:1050px;width:52px;animation-delay:-2s" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z"/></svg>
+    <div class="seen">
+      <div class="cam"><span class="dot"></span><div class="av"><svg width="54" height="54" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.8-4.6 4.3-7 8.5-7s7.7 2.4 8.5 7z"/></svg></div></div>
+      <div><small>I CAN SEE YOU!</small><b id="seenName">Cathy · Year 2</b></div>
+    </div>
+    <div class="robot blink" id="robotA"></div>
+    <div class="bubble"><h1 id="hiName">Hi Cathy!</h1><p>Ready to read to me? I polished my ears just for you!</p></div>
+    <div class="lead">TO START, JUST...</div>
+    <div class="acts">
+      <button class="act" data-rpc="start_reading" title="Tap if voice is not working">
+        <span class="sq-ico" style="width:96px;height:96px"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0h-2a5 5 0 01-10 0zM11 18h2v4h-2z"/></svg></span>
+        <span>Say<b>"Ready!"</b></span>
+        <span class="wave"><i style="height:22px"></i><i style="height:40px;animation-delay:-.2s"></i><i style="height:56px;animation-delay:-.4s"></i><i style="height:34px;animation-delay:-.6s"></i><i style="height:46px;animation-delay:-.1s"></i><i style="height:24px;animation-delay:-.3s"></i></span>
+      </button>
+      <div class="or">or</div>
+      <button class="act" data-rpc="start_reading">
+        <span class="sq-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10V5a1.5 1.5 0 013 0v4h.5V3.5a1.5 1.5 0 013 0V9h.5V4.5a1.5 1.5 0 013 0V10h.5V7a1.5 1.5 0 013 0v7a8 8 0 01-8 8h-1a7 7 0 01-6-3.4L3 13.5a1.5 1.5 0 012.5-1.6L7 14z"/></svg></span>
+        <span>Raise your<b>hand</b></span>
+      </button>
+    </div>
+    <button class="notme" data-rpc="not_me" id="notMe">Not Cathy? Say "That's not me!"</button>
+    <div class="chips">
+      <div class="pill"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 4 6 6 6 12a6 6 0 01-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-4 1-6 1-9z"/></svg></span><span id="streak">3 day streak</span></div>
+      <div class="pill"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg></span><span class="starTotal">128</span></div>
+    </div>
+  </section>
+
+  <!-- ============ 3b + 3c reading ============ -->
+  <section class="screen" id="reading">
+    <div class="topbar">
+      <div class="devs"><i class="live"></i><svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0h-2a5 5 0 01-10 0zM11 18h2v4h-2z"/></svg><i></i><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="6" width="14" height="12" rx="3"/><path d="M17 10l5-3v10l-5-3z"/></svg></div>
+      <div class="pill mission" id="missionPill"><span id="missionNo">Mission 7</span> · <em id="missionTitle">The Lost Sock</em></div>
+      <div class="track" id="track" style="display:none"><div class="fill" id="fill"></div><div class="bot" id="trackBot"><i></i><i></i></div></div>
+      <div class="trophy" id="trophy" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v2h4v3a5 5 0 01-5 5h-.3A5 5 0 0113 15.9V18h3v3H8v-3h3v-2.1A5 5 0 018.3 13H8a5 5 0 01-5-5V5h4zm0 4H5v1a3 3 0 002 2.8zm10 0v3.8A3 3 0 0019 8V7z"/></svg></div>
+      <div class="pill stars-pill" id="starsPill"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg></span><span class="starTotal">128</span></div>
+    </div>
+    <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg><span id="toastTxt">+1 Sentence smashed!</span></div>
+    <div class="passage"><div class="lvl" id="lvl">👟 LEVEL B · 51 WORDS</div><div class="txt" id="txt"></div></div>
+
+    <!-- 3b: waiting for first word -->
+    <div id="waitSide">
+      <div class="bubble say" id="sayBubble">Start reading out loud whenever you're ready! I'm all ears... well, all microphones.</div>
+      <div class="orb pulse"><div class="in"><div class="e"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 2.3 1 3.6 1.9 4.6.8.9 1.1 1.4 1.1 2.4 0 2.8 2 5 4.5 5a3.5 3.5 0 003.5-3.5h-2A1.5 1.5 0 0112.5 19c-1.3 0-2.5-1.3-2.5-3 0-1.8-.8-2.8-1.6-3.7C7.6 11.4 7 10.6 7 9a5 5 0 0110 0h2a7 7 0 00-7-7zm0 4a3 3 0 00-3 3h2a1 1 0 012 0c0 .6-.4.9-1 1.4-.7.5-1.5 1.2-1.5 2.6h2c0-.4.2-.6.7-1 .8-.6 1.8-1.3 1.8-3a3 3 0 00-3-3z"/></svg></div>LISTENING</div></div>
+    </div>
+    <!-- 3c: live -->
+    <div id="liveSide" style="display:none">
+      <div class="meter"><small>SPEED-O-METER</small>
+        <svg width="310" height="180" viewBox="0 0 310 180">
+          <path d="M25 160 A130 130 0 0 1 285 160" fill="none" stroke="#55566a" stroke-width="44"/>
+          <path id="sweet" d="M25 160 A130 130 0 0 1 285 160" fill="none" stroke="#a99cf5" stroke-width="44" stroke-dasharray="0 1000"/>
+          <path d="M60 160 A95 95 0 0 1 250 160 Z" fill="#222228"/>
+          <g id="needle" style="transition:transform .6s cubic-bezier(.3,1.4,.6,1);transform-origin:155px 160px"><rect x="151" y="52" width="8" height="108" rx="4" fill="#e9e5ff"/></g>
+          <circle cx="155" cy="160" r="20" fill="#c9c0ff"/>
+          <text x="280" y="178" font-size="34" text-anchor="middle">🐰</text>
+        </svg>
+        <b id="paceTxt">Warming up...</b>
+      </div>
+      <div class="bubble comment" id="comment">Great start! Keep going...</div>
+      <button class="help" data-rpc="help"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a4 4 0 110 8 4 4 0 010-8zm-6.7 3.3l2.5 1a4.9 4.9 0 000 3.4l-2.5 1a7.9 7.9 0 010-5.4zm13.4 0a7.9 7.9 0 010 5.4l-2.5-1a4.9 4.9 0 000-3.4z"/></svg></span>Stuck? Say "Help!"</button>
+    </div>
+  </section>
+
+  <!-- ============ 3d finish ============ -->
+  <section class="screen" id="finish">
+    <svg class="sparkle" style="left:284px;top:250px;width:54px" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg>
+    <svg class="sparkle" style="left:1590px;top:204px;width:48px;animation-delay:-1s" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z"/></svg>
+    <svg class="sparkle" style="left:1664px;top:570px;width:60px;animation-delay:-2s" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z"/></svg>
+    <div class="stars" id="bigStars"></div>
+    <div class="banner" id="banner">Great work, Cathy!</div>
+    <div class="msg">I'll send some key information to your teacher so they know how you went. You can head back to your desk now.</div>
+    <div class="tiles">
+      <div class="tile"><span class="sq-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 4c3 0 6 .5 9 2.5V21c-3-2-6-2.5-9-2.5zm20 0v14.5c-3 0-6 .5-9 2.5V6.5C16 4.5 19 4 22 4z"/></svg></span><div><small>WORDS READ</small><b id="tWords">0</b></div></div>
+      <div class="tile"><span class="sq-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg></span><div><small>STARS WON</small><b id="tStars">+0</b></div></div>
+      <div class="tile"><span class="sq-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 11L22 2l-9 20-2.5-8.5z"/></svg></span><div><small>SENT TO</small><b id="tSent">Ms. Patel …</b></div></div>
+    </div>
+    <div class="endrow"><button class="act bye" id="byeBtn"><span class="sq-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10V5a1.5 1.5 0 013 0v4h.5V3.5a1.5 1.5 0 013 0V9h.5V4.5a1.5 1.5 0 013 0V10h.5V7a1.5 1.5 0 013 0v7a8 8 0 01-8 8h-1a7 7 0 01-6-3.4L3 13.5a1.5 1.5 0 012.5-1.6L7 14z"/></svg></span><span><b>Wave bye-bye!</b></span></button>
+    <div class="nap"><div class="ring"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="32" fill="none" stroke="#3d3e55" stroke-width="7"/><circle id="napArc" cx="38" cy="38" r="32" fill="none" stroke="#b5a9ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="0"/></svg><b id="napN">7</b></div><span id="napTxt">Robot nap in 7s...</span></div></div>
+  </section>
+
+  <!-- ============ sleep / not me ============ -->
+  <section class="screen" id="sleep"><div class="center-msg"><div class="robot sleep" id="robotS"></div></div><div class="zz">Z z z</div></section>
+  <section class="screen" id="notme"><div class="center-msg"><div class="robot" id="robotN"></div>
+    <div class="bubble" style="margin-top:20px;padding:40px 60px;font-size:46px;font-weight:700">Oops! Please ask your teacher to send the right reader to me.</div></div></section>
+</div></div>
+
+<div id="demo">
+  <b style="color:#fff">Demo</b><span id="demoInfo">Simulated read · real scoring engine</span>
+  <button id="dPlay">▶ Play</button><button id="dRestart">↺ Restart</button>
+  <label>Speed <select id="dSpeed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select></label>
+  <button id="dMarks">Show error marks: off</button>
+  <button id="dLog">Event log</button>
+</div>
+<pre id="log"></pre>
+
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<script>
+/* ======================================================================
+   Reading Robot screen.
+   Live:  /?student=cathy        (connects to LiveKit, agent drives screens)
+   Demo:  /?demo=1               (replays engine output for a simulated read)
+   ====================================================================== */
+const $ = s => document.querySelector(s);
+const qs = new URLSearchParams(location.search);
+const STAR = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg>';
+const UI = { student:null, passage:null, starsBase:0, starsSession:0, marksOn: qs.get('marks')==='1', lastSentence:-1, done:false };
+
+/* ---------- scale the fixed-size robot screen ---------- */
+// Landscape robot screens use a 1920x1240 canvas; phones held upright switch to a
+// 1080x1920 portrait layout so text stays readable instead of shrinking.
+function fit(){
+  const st=$('#stage'), bar=$('#demo').classList.contains('on')?$('#demo').offsetHeight+20:0;
+  const portrait = innerHeight > innerWidth*1.15;
+  st.classList.toggle('portrait', portrait);
+  const W=portrait?1080:1920, H=portrait?1920:1240, pad=portrait?24:40;
+  const s=Math.min(innerWidth/(W+pad), (innerHeight-bar)/(H+pad));
+  st.style.transform=`translate(-50%,-50%) scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+
+/* ---------- robots ---------- */
+function robotHTML(){ return '<div class="ant"></div><div class="ear l"></div><div class="ear r"></div><div class="head"><div class="face"><div class="eye l"></div><div class="eye r"></div><div class="blush l"></div><div class="blush r"></div><div class="mouth"></div></div></div><div class="body"><i class="on"></i><i></i><i></i></div>'; }
+['#robotA','#robotS','#robotN'].forEach(id=>$(id).innerHTML=robotHTML());
+
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id)); }
+function log(ev){ const l=$('#log'); l.textContent = JSON.stringify(ev).slice(0,220)+'\n'+l.textContent.slice(0,6000); }
+
+/* ---------- event handling (same protocol live & demo) ---------- */
+function handle(ev){
+  log(ev);
+  switch(ev.type){
+    case 'state': return onState(ev);
+    case 'passage': return onPassage(ev);
+    case 'progress': return onProgress(ev);
+    case 'robot_says': return onSays(ev);
+    case 'report': return onReport(ev.report);
+    case 'report_sent': $('#tSent').textContent = `${ev.teacher||'Teacher'} ✓`; return;
+  }
+}
+
+function onState(ev){
+  if(ev.state==='greet'){
+    const s = UI.student = ev.student || UI.student || {name:'friend'};
+    $('#seenName').textContent = `${s.name}${s.year?' · '+s.year:''}`;
+    $('#hiName').textContent = `Hi ${s.name}!`;
+    $('#notMe').textContent = `Not ${s.name}? Say "That's not me!"`;
+    $('#streak').textContent = s.streak_days ? `${s.streak_days} day streak` : 'First read!';
+    UI.starsBase = s.stars_total||0; UI.starsSession=0; setStars();
+    show('greet');
+  } else if(ev.state==='reading'){
+    show('reading'); $('#waitSide').style.display=''; $('#liveSide').style.display='none';
+    $('#track').style.display='none'; $('#trophy').style.display='none'; $('#missionPill').style.display='';
+  } else if(ev.state==='finish'){ UI.done=true; }
+  else if(ev.state==='sleep'){ show('sleep'); }
+  else if(ev.state==='not_me'){ show('notme'); }
+}
+
+function onPassage(p){
+  UI.passage = p; UI.lastSentence=-1; UI.done=false;
+  $('#missionNo').textContent = `Mission ${p.mission ?? ''}`.trim();
+  $('#missionTitle').textContent = p.title;
+  $('#lvl').textContent = `👟 LEVEL ${p.level||'-'} · ${p.word_count} WORDS`;
+  $('#txt').innerHTML = p.words.map(w=>`<span class="w p" data-i="${w.i}">${esc(w.t)}</span>`).join(' ');
+  $('#txt').parentElement.classList.add('reading');
+  // checkpoints: one star at the end of each sentence
+  const track=$('#track'); track.querySelectorAll('.cp').forEach(e=>e.remove());
+  const ends={}; p.words.forEach(w=>ends[w.s]=w.i);
+  Object.entries(ends).forEach(([s,i])=>{ if(+i===p.word_count-1) return;
+    const d=document.createElement('div'); d.className='cp'; d.dataset.s=s; d.innerHTML=STAR; d.style.left=((+i+1)/p.word_count*100)+'%'; track.appendChild(d); });
+  $('#fill').style.width='0%'; $('#trackBot').style.left='0%'; $('#trophy').classList.remove('won');
+  applyMarksClass();
+}
+
+function onProgress(e){
+  if(!UI.passage) return;
+  if(e.cursor>=0 && $('#liveSide').style.display==='none'){        // 3b -> 3c on first word
+    $('#waitSide').style.display='none'; $('#liveSide').style.display='';
+    $('#missionPill').style.display='none'; $('#track').style.display=''; $('#trophy').style.display='';
+  }
+  const spans = $('#txt').children;
+  for(let i=0;i<spans.length;i++){
+    const m = e.marks[i];
+    spans[i].className = 'w ' + (m==='p'?'p':'') + (m && m!=='p' && m!=='r' ? ' m'+m : '');
+  }
+  if(e.cursor < UI.passage.word_count-1 && e.cursor>=-1 && !UI.done){
+    spans[e.next] && spans[e.next].classList.add('cur'); spans[e.next] && spans[e.next].classList.remove('p');
+  }
+  const pct = Math.min(100,(e.cursor+1)/UI.passage.word_count*100);
+  $('#fill').style.width=pct+'%'; $('#trackBot').style.left=pct+'%';
+  (e.sentences_done||[]).forEach(s=>{ const cp=$(`#track .cp[data-s="${s}"]`); cp&&cp.classList.add('done'); });
+  if(pct>=100) $('#trophy').classList.add('won');
+  UI.starsSession = e.stars_session||0; setStars();
+  (e.new_sentences||[]).forEach(ns=>{
+    toast(ns.errors===0 ? `+${ns.stars} Sentence smashed!` : `+${ns.stars} Sentence done!`);
+    const r = (UI.passage.reactions||{})[String(ns.sentence)];
+    comment(r || pick(['Nice reading!','You\'re on a roll!','Keep going...','Ooh, what happens next?']));
+  });
+  // speed-o-meter
+  setMeter(e.wcpm, e.pace, e.pace_text);
+}
+
+function setMeter(wcpm, pace, text){
+  $('#paceTxt').textContent = text || 'Warming up...';
+  // map 0..160 WCPM onto -80..80 degrees; sweet zone shown for "just right"
+  const deg = wcpm==null ? -80 : Math.max(-80, Math.min(80, (wcpm/160)*160-80));
+  $('#needle').style.transform = `rotate(${deg}deg)`;
+  const arc = Math.PI*130; // half circumference of r=130
+  $('#sweet').setAttribute('stroke-dasharray', `0 ${arc*0.30} ${arc*0.40} 1000`);
+}
+
+function onSays(ev){
+  // speech bubble on 3b, comment bubble on 3c
+  if($('#reading').classList.contains('on')){
+    if($('#liveSide').style.display==='none') $('#sayBubble').textContent = ev.text; else comment(ev.text);
+  }
+  const r = document.querySelector('.screen.on .robot'); if(r){ r.classList.add('talking'); clearTimeout(r._t); r._t=setTimeout(()=>r.classList.remove('talking'), Math.min(4500, 60*ev.text.length)); }
+}
+
+function onReport(r){
+  const name = r.student_name || (UI.student&&UI.student.name) || 'friend';
+  $('#banner').textContent = `Great work, ${name}!`;
+  $('#tWords').textContent = r.words_attempted;
+  $('#tStars').textContent = '+' + r.stars_earned;
+  $('#tSent').textContent = `${r.teacher||'Teacher'} …`;
+  const n = r.star_rating||1;
+  $('#bigStars').innerHTML = [0,1,2].map(i=>`<div class="bigstar ${i===1?'mid':''} ${i<n?'':'dim'}" style="--r:${[-8,0,8][i]}deg;transition-delay:${.15+i*.25}s">${STAR}</div>`).join('');
+  UI.starsSession = r.stars_earned; setStars();
+  show('finish'); const f=$('#finish'); f.classList.remove('pop'); requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.add('pop')));
+  napCountdown(8);
+}
+
+let napTimer;
+function napCountdown(sec){
+  clearInterval(napTimer); let left=sec; const total=sec;
+  const tick=()=>{ $('#napN').textContent=Math.max(0,left-1); $('#napTxt').textContent=`Robot nap in ${Math.max(0,left-1)}s...`;
+    $('#napArc').setAttribute('stroke-dashoffset', 201*(1-(left-1)/total)); if(--left<=0){ clearInterval(napTimer); if(MODE==='demo') show('sleep'); } };
+  tick(); napTimer=setInterval(tick, 1000/(MODE==='demo'?DEMO.speed:1));
+}
+
+function setStars(){ document.querySelectorAll('.starTotal').forEach(e=>e.textContent = UI.starsBase + UI.starsSession); }
+let toastT; function toast(t){ $('#toastTxt').textContent=t; const el=$('#toast'); el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),1800); }
+function comment(t){ const c=$('#comment'); c.style.opacity=0; setTimeout(()=>{c.textContent=t;c.style.opacity=1},200); }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function applyMarksClass(){ $('#txt').parentElement.classList.toggle('marks-on', UI.marksOn); $('#dMarks').textContent='Show error marks: '+(UI.marksOn?'on':'off'); $('#dMarks').classList.toggle('on',UI.marksOn); }
+
+/* ---------- touch fallbacks -> agent RPC ---------- */
+document.querySelectorAll('[data-rpc]').forEach(b=>b.addEventListener('click', ()=>rpc(b.dataset.rpc)));
+$('#byeBtn').addEventListener('click', ()=>{ if(MODE==='demo') show('sleep'); });
+
+/* ======================= LIVE MODE (LiveKit) ======================= */
+let MODE = qs.get('demo') ? 'demo' : 'live', room=null;
+async function startLive(studentId){
+  if(!window.isSecureContext){ $('#startErr').textContent='The microphone needs HTTPS. Open this page over https:// (or localhost).'; return; }
+  $('#startErr').textContent='Connecting...';
+  try{
+    const r = await fetch(`/api/token?student=${encodeURIComponent(studentId)}`);
+    if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const {url, token} = await r.json();
+    const LK = LivekitClient;
+    room = new LK.Room({ adaptiveStream:true, dynacast:true,
+      audioCaptureDefaults:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } });
+    room.on(LK.RoomEvent.DataReceived, (payload, participant, kind, topic)=>{
+      if(topic!=='reading-robot') return;
+      try{ handle(JSON.parse(new TextDecoder().decode(payload))); }catch(e){ console.warn(e); }
+    });
+    room.on(LK.RoomEvent.TrackSubscribed, (track)=>{ if(track.kind==='audio'){ const el=track.attach(); el.style.display='none'; document.body.appendChild(el); } });
+    room.on(LK.RoomEvent.Disconnected, ()=>{ if(!UI.done) show('sleep'); });
+    await room.connect(url, token);
+    try{ await room.startAudio(); }catch{}
+    await room.localParticipant.setMicrophoneEnabled(true);
+    if(qs.get('camera')==='1') await room.localParticipant.setCameraEnabled(true);
+    $('#startErr').textContent='Waking the robot up...';
+  }catch(e){ $('#startErr').textContent = 'Could not connect: '+e.message+' — try ?demo=1'; }
+}
+function agentIdentity(){
+  if(!room) return null;
+  for(const p of room.remoteParticipants.values()){ if(p.isAgent || (p.kind===LivekitClient.ParticipantKind?.AGENT) || p.identity.startsWith('agent')) return p.identity; }
+  return null;
+}
+async function rpc(method){
+  if(MODE==='demo'){ return demoRpc(method); }
+  const id=agentIdentity(); if(!id) return;
+  try{ await room.localParticipant.performRpc({destinationIdentity:id, method, payload:'{}'}); }catch(e){ console.warn('rpc',method,e); }
+}
+
+async function loadRoster(){
+  try{
+    const r = await fetch('/api/roster'); if(!r.ok) throw 0; const ro = await r.json();
+    $('#roster').innerHTML = ro.students.map(s=>`<button class="act" data-s="${s.id}"><span class="sq-ico" style="width:72px;height:72px">${STAR}</span><span><b>${esc(s.name)}</b>${esc(s.year||'')}</span></button>`).join('')
+      + `<button class="act" data-demo="1"><span><b>Demo</b>simulated read</span></button>`;
+    $('#roster').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>startLive(b.dataset.s));
+    $('#roster').querySelector('[data-demo]').onclick=()=>{ MODE='demo'; startDemo(); };
+    if(qs.get('student')){ $('#startHint').textContent='Tap to start'; }
+  }catch{ MODE='demo'; startDemo(); }
+}
+
+/* ======================= DEMO MODE (replay) ======================= */
+const DEMO = { events:[], i:0, t0:0, speed:2, timer:null, playing:false, offset:0 };
+async function startDemo(){
+  $('#demo').classList.add('on'); document.body.classList.add('demo'); fit();
+  if(!DEMO.events.length){
+    const inline = document.getElementById('demo-data');
+    if(inline && inline.textContent.trim().length>2) DEMO.events = JSON.parse(inline.textContent);
+    else { const r = await fetch('demo_events.json').catch(()=>fetch('/web/demo_events.json')); DEMO.events = await r.json(); }
+  }
+  UI.marksOn = qs.get('marks')!=='0'; applyMarksClass();
+  demoRestart(); demoPlay();
+}
+function demoRestart(){ clearTimeout(DEMO.timer); DEMO.i=0; DEMO.offset=0; DEMO.playing=false; UI.done=false; $('#dPlay').textContent='▶ Play'; show('start'); }
+function demoPlay(){
+  if(DEMO.playing){ DEMO.playing=false; clearTimeout(DEMO.timer); DEMO.offset = DEMO.events[DEMO.i]?.t ?? DEMO.offset; $('#dPlay').textContent='▶ Play'; return; }
+  DEMO.playing=true; $('#dPlay').textContent='❚❚ Pause';
+  DEMO.t0 = performance.now() - DEMO.offset*1000/DEMO.speed; step();
+}
+function step(){
+  if(!DEMO.playing) return;
+  const now = (performance.now()-DEMO.t0)/1000*DEMO.speed;
+  while(DEMO.i<DEMO.events.length && DEMO.events[DEMO.i].t<=now){ handle(DEMO.events[DEMO.i]); DEMO.i++; }
+  if(DEMO.i>=DEMO.events.length){ DEMO.playing=false; $('#dPlay').textContent='▶ Play'; return; }
+  DEMO.timer=setTimeout(step, 40);
+}
+function demoRpc(m){ /* in the replay, touch buttons just flash */ }
+$('#dPlay').onclick=demoPlay; $('#dRestart').onclick=()=>{demoRestart();demoPlay();};
+$('#dSpeed').onchange=e=>{ const cur=(performance.now()-DEMO.t0)/1000*DEMO.speed; DEMO.speed=+e.target.value; DEMO.t0=performance.now()-cur*1000/DEMO.speed; };
+$('#dMarks').onclick=()=>{ UI.marksOn=!UI.marksOn; applyMarksClass(); };
+$('#dLog').onclick=()=>$('#log').classList.toggle('on');
+
+if(MODE==='demo') startDemo(); else loadRoster().then(()=>{
+  const sid=qs.get('student'); if(!sid || MODE!=='live') return;
+  // Mobile browsers only allow mic + robot voice after a tap, so the kiosk URL shows one Start button.
+  $('#startHint').textContent='Tap Start, then allow the microphone';
+  $('#roster').innerHTML=`<button class="btn" id="goBtn">▶ Start</button>`;
+  $('#goBtn').onclick=()=>startLive(sid);
+});
+</script>
+<script id="demo-data" type="application/json"></script>
+</body>
+</html>

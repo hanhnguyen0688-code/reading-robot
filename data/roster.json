@@ -1,0 +1,8 @@
+{
+  "class": "2P",
+  "teacher": "Ms. Patel",
+  "students": [
+    {"id": "cathy", "name": "Cathy", "year": "Year 2", "teacher": "Ms. Patel", "passage_id": "mission-7", "streak_days": 3, "stars_total": 128},
+    {"id": "leo", "name": "Leo", "year": "Year 2", "teacher": "Ms. Patel", "passage_id": "mission-8", "streak_days": 1, "stars_total": 64}
+  ]
+}

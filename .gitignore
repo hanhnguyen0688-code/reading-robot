@@ -1,0 +1,6 @@
+.env
+__pycache__/
+reports/*.json
+!reports/sample_cathy.json
+tests/fixtures/parity.json
+android/app/src/main/assets/
