@@ -44,6 +44,9 @@ jobs:
           for f in android/app/build/test-results/testDebugUnitTest/*.xml; do [ -f "$f" ] && grep -o 'testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$f"; done || true
       - uses: actions/upload-artifact@v4
         with: { name: ReadingRobot-apk, path: "ReadingRobot-*.apk" }
+      - name: Remove the old single-file APK from the release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release delete-asset latest ReadingRobot.apk -y -R "${{ github.repository }}" || true
       - name: Publish as release "latest"
         uses: softprops/action-gh-release@v2
         with:
