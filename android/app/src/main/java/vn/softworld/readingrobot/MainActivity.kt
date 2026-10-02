@@ -33,7 +33,7 @@ import vn.softworld.readingrobot.ui.TeacherColors
 import vn.softworld.readingrobot.ui.TeacherScreen
 
 class MainActivity : ComponentActivity() {
-    private val vm: ReadingViewModel by viewModels()
+    val vm: ReadingViewModel by viewModels()
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {

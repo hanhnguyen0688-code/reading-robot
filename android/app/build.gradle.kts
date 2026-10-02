@@ -14,6 +14,7 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0-native"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
@@ -45,4 +46,10 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.13.0@aar")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
