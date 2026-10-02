@@ -34,19 +34,21 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew --no-daemon testDebugUnitTest assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk ../ReadingRobot.apk
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk ../ReadingRobot-arm64.apk
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk ../ReadingRobot-armv7.apk
+          ls -la ../ReadingRobot-*.apk
       - name: Test report
         if: always()
         run: |
           for f in android/app/build/test-results/testDebugUnitTest/*.xml; do [ -f "$f" ] && grep -o 'testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$f"; done || true
       - uses: actions/upload-artifact@v4
-        with: { name: ReadingRobot-apk, path: ReadingRobot.apk }
+        with: { name: ReadingRobot-apk, path: "ReadingRobot-*.apk" }
       - name: Publish as release "latest"
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Reading Robot (latest build)
-          body: "Native Android app (Kotlin + Compose) with offline speech recognition. Download ReadingRobot.apk on the tablet, open it and allow installation. Built from ${{ github.sha }}."
-          files: ReadingRobot.apk
+          body: "Native Android app (Kotlin + Compose) with offline speech recognition. Most tablets: ReadingRobot-arm64.apk. Older 32-bit devices: ReadingRobot-armv7.apk. Built from ${{ github.sha }}."
+          files: ReadingRobot-*.apk
           make_latest: true

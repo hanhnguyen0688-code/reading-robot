@@ -43,7 +43,9 @@ jobs:
           working-directory: android
           script: |
             ./gradlew --no-daemon connectedDebugAndroidTest || (mkdir -p ../screens && adb pull /sdcard/Download ../screens/ ; adb logcat -d -t 400 > ../screens/logcat.txt ; exit 1)
-            mkdir -p ../screens && adb pull /sdcard/Download ../screens/ && adb logcat -d -t 400 > ../screens/logcat.txt
+            mkdir -p ../screens && adb pull /sdcard/Download ../screens/
+            ./gradlew --no-daemon assembleRelease
+            bash ../.github/scripts/release-smoke.sh app/build/outputs/apk/release/app-x86_64-release.apk ../screens
       - name: Collect results
         if: always()
         run: |
@@ -59,6 +61,7 @@ jobs:
           body: "Screenshots from the latest emulator run of ReadingFlowTest (${{ github.sha }})."
           files: |
             screens/*.png
+            screens/release-logcat.txt
             screens/*.xml
             screens/logcat.txt
           prerelease: true

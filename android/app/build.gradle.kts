@@ -15,11 +15,25 @@ android {
         versionCode = 2
         versionName = "0.2.0-native"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+    }
+
+    // One APK per processor type keeps each file small enough to share (most tablets are arm64-v8a).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
+        }
     }
 
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")   // test builds for sideloading; use a real key for the store
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -27,7 +41,6 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
-    androidResources { noCompress += listOf("mdl", "conf", "int", "fst", "mat", "txt") }   // Vosk model files are read as-is
 }
 
 dependencies {
