@@ -1,4 +1,6 @@
-# Builds the Reading Robot APK on every push and publishes it as a downloadable release ("latest").
+# Builds the native Reading Robot app (Kotlin + Jetpack Compose) on every push:
+# runs the engine unit tests (must match the Python engine), bundles the offline Vosk model,
+# and publishes the APK as the "latest" release.
 name: Build Android APK
 on:
   push:
@@ -14,13 +16,30 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build debug APK
+      - name: Offline speech model (Vosk, English small)
+        uses: actions/cache@v4
+        with: { path: vosk-model, key: vosk-model-small-en-us-0.15 }
+      - name: Bundle the model into the app
+        run: |
+          if [ ! -d vosk-model/vosk-model-small-en-us-0.15 ]; then
+            mkdir -p vosk-model && curl -sSL -o vosk-model/m.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+            (cd vosk-model && unzip -q m.zip && rm m.zip)
+          fi
+          A=android/app/src/main/assets/model-en-us
+          rm -rf $A && mkdir -p $A && cp -r vosk-model/vosk-model-small-en-us-0.15/. $A/
+          echo "vosk-model-small-en-us-0.15" > $A/uuid
+          du -sh $A
+      - name: Unit tests + build
         working-directory: android
         run: |
-          echo "sdk.dir=$ANDROID_HOME" > local.properties   # GitHub's Ubuntu runners ship the Android SDK
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon testDebugUnitTest assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk ../ReadingRobot.apk
+      - name: Test report
+        if: always()
+        run: |
+          for f in android/app/build/test-results/testDebugUnitTest/*.xml; do [ -f "$f" ] && grep -o 'testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$f"; done || true
       - uses: actions/upload-artifact@v4
         with: { name: ReadingRobot-apk, path: ReadingRobot.apk }
       - name: Publish as release "latest"
@@ -28,6 +47,6 @@ jobs:
         with:
           tag_name: latest
           name: Reading Robot (latest build)
-          body: "Tải ReadingRobot.apk trên máy Android, mở file và cho phép cài đặt. Bản build từ commit ${{ github.sha }}."
+          body: "Native Android app (Kotlin + Compose) with offline speech recognition. Download ReadingRobot.apk on the tablet, open it and allow installation. Built from ${{ github.sha }}."
           files: ReadingRobot.apk
           make_latest: true

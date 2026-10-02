@@ -4,3 +4,4 @@ app/build/
 local.properties
 .idea/
 *.iml
+app/src/main/assets/model-en-us/
