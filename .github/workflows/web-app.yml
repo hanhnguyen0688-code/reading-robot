@@ -1,8 +1,8 @@
 # Publishes the app/ folder to GitHub Pages so it opens in Chrome on any Android tablet (HTTPS, mic allowed).
 name: Publish web app
+# Run manually after turning on Settings > Pages > Source: GitHub Actions
+# (GitHub Pages needs a public repo, or a paid plan for private repos).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
