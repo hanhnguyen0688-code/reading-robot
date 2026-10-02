@@ -15,12 +15,12 @@ tap_text() {   # find a text on screen via the accessibility tree and tap its ce
     adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     adb shell cat /sdcard/ui.xml > /tmp/ui.xml
     B=$(python3 - "$1" <<'PY'
-import re,sys
+import re,sys,html
 xml=open('/tmp/ui.xml',encoding='utf-8',errors='ignore').read()
 for m in re.finditer(r'<node [^>]*>', xml):
     n=m.group(0)
     t=re.search(r' text="([^"]*)"', n); d=re.search(r'content-desc="([^"]*)"', n)
-    if (t and t.group(1)==sys.argv[1]) or (d and d.group(1)==sys.argv[1]):
+    if (t and html.unescape(t.group(1))==sys.argv[1]) or (d and html.unescape(d.group(1))==sys.argv[1]):
         b=re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n)
         if b:
             x1,y1,x2,y2=map(int,b.groups()); print((x1+x2)//2,(y1+y2)//2); break
@@ -38,7 +38,7 @@ ok=1
 adb shell screencap -p /sdcard/rel-1-home.png
 tap_text "Cathy" || ok=0
 sleep 4; adb shell screencap -p /sdcard/rel-2-greet.png
-tap_text '"Ready!"' || ok=0
+tap_text 'hand' || ok=0          # the "Raise your hand" button
 sleep 12; adb shell screencap -p /sdcard/rel-3-passage.png
 has_text "LEVEL B" || { echo "passage screen not shown"; ok=0; }
 alive || { echo "app process died"; ok=0; }
