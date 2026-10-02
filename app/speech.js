@@ -18,9 +18,11 @@
   // ------------------------------------------------------------ listening
   class NativeListener {
     constructor() { this.name = 'android_speechrecognizer'; this.cb = null; }
-    start(lang, onResult, onError) {
+    start(lang, onResult, onError, onStatus) {
       this.cb = onResult; bridge.onResult = (t, f) => this.cb && this.cb(String(t || ''), !!f);
       bridge.onError = e => onError && onError(String(e));
+      bridge.onState = st => onStatus && onStatus({ state: String(st) });     // listening | idle | error:<code>
+      bridge.onLevel = v => onStatus && onStatus({ level: +v });              // microphone loudness 0..1
       native().startListening(lang);
     }
     stop() { this.cb = null; try { native().stopListening(); } catch (e) {} }
@@ -29,9 +31,10 @@
   class WebListener {
     constructor() { this.name = 'web_speech'; this.rec = null; this.running = false; }
     static supported() { return !!(root.SpeechRecognition || root.webkitSpeechRecognition); }
-    start(lang, onResult, onError) {
+    start(lang, onResult, onError, onStatus) {
       const SR = root.SpeechRecognition || root.webkitSpeechRecognition;
       this.running = true; this.onResult = onResult; this.onError = onError;
+      const status = x => onStatus && onStatus(x);
       const boot = () => {
         if (!this.running) return;
         const rec = this.rec = new SR();
@@ -56,9 +59,13 @@
         };
         rec.onerror = e => {
           if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { this.running = false; this.onError && this.onError('mic-denied'); }
+          else if (e.error === 'network') this.onError && this.onError('network');
           else if (e.error !== 'no-speech' && e.error !== 'aborted') this.onError && this.onError(e.error);
         };
-        rec.onend = () => { if (this.running) setTimeout(boot, 120); };   // keep listening across pauses
+        rec.onstart = () => status({ state: 'listening' });
+        rec.onsoundstart = () => status({ level: 0.7 });
+        rec.onsoundend = () => status({ level: 0 });
+        rec.onend = () => { status({ state: this.running ? 'restarting' : 'idle' }); if (this.running) setTimeout(boot, 120); };   // keep listening across pauses
         try { rec.start(); } catch (e) { setTimeout(boot, 400); }
       };
       boot();
@@ -69,7 +76,7 @@
   // Test double: window.__RRFake = { listen: fn(onResult) } lets automated tests "speak".
   class FakeListener {
     constructor() { this.name = 'fake'; }
-    start(lang, onResult) { root.__RRFake.emit = (t, f) => onResult(t, f); }
+    start(lang, onResult, onError, onStatus) { root.__RRFake.emit = (t, f) => onResult(t, f); onStatus && onStatus({ state: 'listening' }); root.__RRFake.level = v => onStatus && onStatus({ level: v }); }
     stop() { if (root.__RRFake) root.__RRFake.emit = () => {}; }
   }
 

@@ -19,6 +19,7 @@
     retry: "When you're ready, just say Ready, or tap the button!",
     stall: ['Take your time. If a word is tricky, just say Help!', "You're doing great. Keep going, or say Help if you're stuck."],
     told: w => `That word is ${w}.`,
+    cantHear: "Hmm, I can't hear you yet. Read a little louder, or tap my ear and try again.",
   };
   const READY = new Set(['ready', 'yes', 'yeah', 'yep', 'ok', 'okay', 'start', 'go']);
   const NOT_ME = ['not me', 'thats not me', 'wrong name', 'im not'];
@@ -49,19 +50,40 @@
       if (!this.listener) { this.emit({ type: 'error', text: 'Speech recognition is not available on this device.' }); return; }
       this.phase = 'greet';
       this.emit({ type: 'state', state: 'greet', student: this.student });
-      this.listener.start(this.settings.locale || 'en-AU', (t, f) => this.onSpeech(t, f), e => this.onSpeechError(e));
+      this.startListening();
       await this.say(L.greeting(this.student.name));
       this.later(() => { if (this.phase === 'greet') this.say(L.retry); }, 20000);
       this.later(() => { if (this.phase === 'greet') this.end('no_response'); }, 60000);
     }
 
+    startListening() {
+      this.heardAny = false;
+      this.listener.start(this.settings.locale || 'en-AU', (t, f) => this.onSpeech(t, f), e => this.onSpeechError(e), st => this.onMicStatus(st));
+    }
+    /** Tap on the ear: restart the recogniser (it can get stuck on some tablets). */
+    restartListening() {
+      if (!this.listener || this.phase === 'finish' || this.phase === 'ended') return;
+      this.emit({ type: 'mic', state: 'starting' });
+      this.listener.stop();
+      setTimeout(() => { if (this.phase === 'greet' || this.phase === 'reading' || this.phase === 'starting') this.startListening(); }, 350);
+    }
+    onMicStatus(st) { this.emit({ type: 'mic', ...st }); }
+
     onSpeechError(e) {
-      if (e === 'mic-denied') this.emit({ type: 'error', text: 'Microphone permission was denied. Allow the microphone for this app, then try again.' });
+      const msg = {
+        'mic-denied': 'Microphone permission was denied. Allow the microphone for Reading Robot in Android Settings, then try again.',
+        'no-recognizer': 'This tablet has no speech recognition service. Install or update the Google app (and Speech Services by Google), then try again.',
+        'network': 'Speech recognition needs an internet connection. Check the Wi-Fi, then tap the ear to listen again.',
+      }[e];
+      this.emit({ type: 'mic', state: 'error:' + e });
+      if (e === 'network') { this.emit({ type: 'robot_says', text: "I can't hear you without the internet. Check the Wi-Fi, then tap my ear." }); return; }
+      if (msg) this.emit({ type: 'error', text: msg });
     }
 
     onSpeech(text, isFinal) {
       if (this.muted() || this.phase === 'finish' || this.phase === 'idle') return;
       const words = E.splitHypothesis(text);
+      if (words.length) { this.heardAny = true; this.emit({ type: 'heard', text, final: isFinal }); }
       if (this.phase === 'greet') {
         // The robot's own greeting ("Ready to read to me?") can reach the mic late: ignore it.
         const low = text.toLowerCase();
@@ -85,6 +107,7 @@
       if (method === 'not_me' && this.phase === 'greet') return this.notMe();
       if (method === 'help' && this.phase === 'reading') return this.help();
       if (method === 'finish' && this.phase === 'reading') return this.finish('manual');
+      if (method === 'listen') return this.restartListening();
     }
 
     async notMe() {
@@ -147,7 +170,8 @@
       if ((nowMs - this.startedAt) / 1000 >= cfg.maxSessionSeconds) return this.finish('time_limit');
       if (idle >= cfg.stallFinishSeconds && silent >= cfg.stallFinishSeconds) return this.finish('stalled');
       if (idle >= cfg.stallPromptSeconds * (this.stallPrompts + 1) && this.stallPrompts < L.stall.length) {
-        this.say(L.stall[this.stallPrompts++]);
+        this.say(this.heardAny ? L.stall[this.stallPrompts] : L.cantHear);
+        this.stallPrompts++;
       }
     }
 

@@ -51,6 +51,8 @@ public class MainActivity extends Activity {
     private boolean wantListening = false;   // JS asked us to listen
     private boolean speaking = false;        // TTS is talking: recogniser paused
     private String listenLang = "en-AU";
+    private long lastLevelAt = 0;
+    private int networkErrors = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,7 +114,7 @@ public class MainActivity extends Activity {
             main.post(() -> { listenLang = lang == null || lang.isEmpty() ? "en-AU" : lang; wantListening = true; if (!speaking) beginRecognition(); });
         }
         @JavascriptInterface public void stopListening() {
-            main.post(() -> { wantListening = false; endRecognition(); });
+            main.post(() -> { wantListening = false; endRecognition(); js("window.RRSpeech.onState && window.RRSpeech.onState('idle')"); });
         }
         @JavascriptInterface public void speak(String text, String id, String locale, double rate, double pitch) {
             main.post(() -> doSpeak(text, id, locale, (float) rate, (float) pitch));
@@ -160,9 +162,16 @@ public class MainActivity extends Activity {
     }
 
     private class Listener implements RecognitionListener {
-        @Override public void onReadyForSpeech(Bundle b) { }
+        @Override public void onReadyForSpeech(Bundle b) { js("window.RRSpeech.onState && window.RRSpeech.onState('listening')"); }
         @Override public void onBeginningOfSpeech() { }
-        @Override public void onRmsChanged(float v) { }
+        @Override public void onRmsChanged(float rmsDb) {
+            // Mic loudness for the pulsing ear on screen, at most ~8 updates per second.
+            long now = System.currentTimeMillis();
+            if (now - lastLevelAt < 120) return;
+            lastLevelAt = now;
+            float level = Math.max(0f, Math.min(1f, (rmsDb + 2f) / 12f));
+            js("window.RRSpeech.onLevel && window.RRSpeech.onLevel(" + level + ")");
+        }
         @Override public void onBufferReceived(byte[] b) { }
         @Override public void onEndOfSpeech() { }
         @Override public void onEvent(int t, Bundle b) { }
@@ -170,6 +179,7 @@ public class MainActivity extends Activity {
         @Override public void onPartialResults(Bundle b) { deliver(b, false); }
 
         @Override public void onResults(Bundle b) {
+            networkErrors = 0;
             deliver(b, true);
             restartSoon(50);           // keep listening for the next sentence
         }
@@ -179,7 +189,21 @@ public class MainActivity extends Activity {
                 js("window.RRSpeech.onError && window.RRSpeech.onError('mic-denied')");
                 return;
             }
-            if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) { endRecognition(); restartSoon(600); return; }
+            if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || error == SpeechRecognizer.ERROR_CLIENT) {
+                // a stuck recogniser: throw it away and make a fresh one
+                if (recognizer != null) { try { recognizer.destroy(); } catch (Exception ignored) { } recognizer = null; }
+                restartSoon(600);
+                return;
+            }
+            if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_SERVER
+                    || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
+                if (++networkErrors >= 3) {     // tell the screen once it is clearly not a blip
+                    networkErrors = 0;
+                    js("window.RRSpeech.onError && window.RRSpeech.onError('network')");
+                }
+            } else if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                js("window.RRSpeech.onState && window.RRSpeech.onState('error:" + error + "')");
+            }
             // ERROR_NO_MATCH / ERROR_SPEECH_TIMEOUT happen whenever the child pauses: just listen again
             restartSoon(error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_SERVER ? 1500 : 150);
         }

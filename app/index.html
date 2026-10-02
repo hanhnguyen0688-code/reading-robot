@@ -256,6 +256,17 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #stage.portrait #start .card{width:940px}
 #stage.portrait #sleep .zz{left:700px;top:600px}
 
+.orb{border:0;cursor:pointer;color:inherit;transition:transform .12s ease-out}
+.orb.off{background:radial-gradient(circle,#6c6a86 0%,#55546d 58%,rgba(85,84,109,.25) 60%,rgba(85,84,109,.08) 72%,transparent 73%);animation:none}
+.orb.off .e{color:#55546d}
+.orb.err{background:radial-gradient(circle,#ff9fb2 0%,#d9637f 58%,rgba(217,99,127,.25) 60%,transparent 73%);animation:none}
+.heard{position:absolute;right:56px;top:1066px;width:440px;text-align:center;font-size:26px;font-weight:600;color:#c9c4f2;min-height:34px;line-height:1.3;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.heard.live{top:960px;width:376px;font-size:24px}
+.heard:empty{display:none}
+#stage.portrait .heard{right:40px;top:1700px;width:330px}
+#stage.portrait .heard.live{right:30px;top:1770px;width:500px}
+
 
 /* ===================== app shell additions ===================== */
 html,body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
@@ -430,7 +441,8 @@ html,body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif
     <!-- 3b: waiting for first word -->
     <div id="waitSide">
       <div class="bubble say" id="sayBubble">Start reading out loud whenever you're ready! I'm all ears... well, all microphones.</div>
-      <div class="orb pulse"><div class="in"><div class="e"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 2.3 1 3.6 1.9 4.6.8.9 1.1 1.4 1.1 2.4 0 2.8 2 5 4.5 5a3.5 3.5 0 003.5-3.5h-2A1.5 1.5 0 0112.5 19c-1.3 0-2.5-1.3-2.5-3 0-1.8-.8-2.8-1.6-3.7C7.6 11.4 7 10.6 7 9a5 5 0 0110 0h2a7 7 0 00-7-7zm0 4a3 3 0 00-3 3h2a1 1 0 012 0c0 .6-.4.9-1 1.4-.7.5-1.5 1.2-1.5 2.6h2c0-.4.2-.6.7-1 .8-.6 1.8-1.3 1.8-3a3 3 0 00-3-3z"/></svg></div>LISTENING</div></div>
+      <button class="orb pulse" id="orb" data-rpc="listen" aria-label="Tap to listen again"><div class="in"><div class="e"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 2.3 1 3.6 1.9 4.6.8.9 1.1 1.4 1.1 2.4 0 2.8 2 5 4.5 5a3.5 3.5 0 003.5-3.5h-2A1.5 1.5 0 0112.5 19c-1.3 0-2.5-1.3-2.5-3 0-1.8-.8-2.8-1.6-3.7C7.6 11.4 7 10.6 7 9a5 5 0 0110 0h2a7 7 0 00-7-7zm0 4a3 3 0 00-3 3h2a1 1 0 012 0c0 .6-.4.9-1 1.4-.7.5-1.5 1.2-1.5 2.6h2c0-.4.2-.6.7-1 .8-.6 1.8-1.3 1.8-3a3 3 0 00-3-3z"/></svg></div><span id="orbTxt">LISTENING</span></div></button>
+      <div class="heard" id="heard"></div>
     </div>
     <!-- 3c: live -->
     <div id="liveSide" style="display:none">
@@ -447,6 +459,7 @@ html,body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif
       </div>
       <div class="bubble comment" id="comment">Great start! Keep going...</div>
       <button class="help" data-rpc="help"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a4 4 0 110 8 4 4 0 010-8zm-6.7 3.3l2.5 1a4.9 4.9 0 000 3.4l-2.5 1a7.9 7.9 0 010-5.4zm13.4 0a7.9 7.9 0 010 5.4l-2.5-1a4.9 4.9 0 000-3.4z"/></svg></span>Stuck? Say "Help!"</button>
+      <div class="heard live" id="heard2"></div>
     </div>
   </section>
 
@@ -678,9 +691,30 @@ const sleepTap=document.createElement('div'); sleepTap.className='tap'; sleepTap
 
 function appHandle(ev){
   if(ev.type==='error'){ showError(ev.text); return; }
+  if(ev.type==='mic'){ onMic(ev); return; }
+  if(ev.type==='heard'){ const t='“'+ev.text+'”'; $('#heard').textContent=t; $('#heard2').textContent=t; return; }
+  if(ev.type==='state' && (ev.state==='greet'||ev.state==='reading')){ $('#heard').textContent=''; $('#heard2').textContent=''; }
   if(ev.type==='report_sent'){ $('#tSent').textContent = `${ev.teacher} ✓`; return; }
   handle(ev);
 }
+/* microphone status on the ear button: listening / waking up / error, and a live loudness pulse */
+let levelT;
+function onMic(ev){
+  const orb=$('#orb'), txt=$('#orbTxt'), dot=document.querySelector('.devs i');
+  if(ev.level!==undefined){
+    const v=Math.max(0,Math.min(1,ev.level));
+    orb.style.transform=`scale(${1+v*0.14})`; if(dot) dot.style.transform=`scale(${1+v*1.2})`;
+    clearTimeout(levelT); levelT=setTimeout(()=>{ orb.style.transform=''; if(dot) dot.style.transform=''; },400);
+    return;
+  }
+  const st=String(ev.state||'');
+  orb.classList.remove('off','err');
+  if(st==='listening'||st==='restarting'){ txt.textContent='LISTENING'; }
+  else if(st==='starting'){ txt.textContent='WAKING UP…'; }
+  else if(st==='idle'){ orb.classList.add('off'); txt.textContent='TAP TO LISTEN'; }
+  else if(st.startsWith('error')){ orb.classList.add('err'); txt.textContent='TAP TO TRY AGAIN'; }
+}
+
 let errT; function showError(text){
   let el=$('#stage .err'); if(!el){ el=document.createElement('div'); el.className='err'; $('#stage').appendChild(el); }
   el.textContent=text; el.hidden=false; clearTimeout(errT); errT=setTimeout(()=>{ el.hidden=true; }, 7000);

@@ -190,9 +190,30 @@ const sleepTap=document.createElement('div'); sleepTap.className='tap'; sleepTap
 
 function appHandle(ev){
   if(ev.type==='error'){ showError(ev.text); return; }
+  if(ev.type==='mic'){ onMic(ev); return; }
+  if(ev.type==='heard'){ const t='“'+ev.text+'”'; $('#heard').textContent=t; $('#heard2').textContent=t; return; }
+  if(ev.type==='state' && (ev.state==='greet'||ev.state==='reading')){ $('#heard').textContent=''; $('#heard2').textContent=''; }
   if(ev.type==='report_sent'){ $('#tSent').textContent = `${ev.teacher} ✓`; return; }
   handle(ev);
 }
+/* microphone status on the ear button: listening / waking up / error, and a live loudness pulse */
+let levelT;
+function onMic(ev){
+  const orb=$('#orb'), txt=$('#orbTxt'), dot=document.querySelector('.devs i');
+  if(ev.level!==undefined){
+    const v=Math.max(0,Math.min(1,ev.level));
+    orb.style.transform=`scale(${1+v*0.14})`; if(dot) dot.style.transform=`scale(${1+v*1.2})`;
+    clearTimeout(levelT); levelT=setTimeout(()=>{ orb.style.transform=''; if(dot) dot.style.transform=''; },400);
+    return;
+  }
+  const st=String(ev.state||'');
+  orb.classList.remove('off','err');
+  if(st==='listening'||st==='restarting'){ txt.textContent='LISTENING'; }
+  else if(st==='starting'){ txt.textContent='WAKING UP…'; }
+  else if(st==='idle'){ orb.classList.add('off'); txt.textContent='TAP TO LISTEN'; }
+  else if(st.startsWith('error')){ orb.classList.add('err'); txt.textContent='TAP TO TRY AGAIN'; }
+}
+
 let errT; function showError(text){
   let el=$('#stage .err'); if(!el){ el=document.createElement('div'); el.className='err'; $('#stage').appendChild(el); }
   el.textContent=text; el.hidden=false; clearTimeout(errT); errT=setTimeout(()=>{ el.hidden=true; }, 7000);
