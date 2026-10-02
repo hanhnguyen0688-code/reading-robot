@@ -104,7 +104,7 @@
       this.state = this.empty();
     }
     empty() { return { words: this.ref.map((_, i) => wordResult(i)), insertions: [], cursor: -1, hypCount: 0, firstStart: null, lastEnd: null }; }
-    markTold(i) { if (i >= 0 && i < this.ref.length) this.told.add(i); }
+    markTold(i) { if (i >= 0 && i < this.ref.length) { this.told.add(i); this.state = this.align(); } }
     update(hyp) {
       let h = hyp.filter(x => x.norm && !FILLERS.has(x.norm));
       if (!this.ref.some(r => CONTROL.has(r))) h = h.filter(x => !CONTROL.has(x.norm));

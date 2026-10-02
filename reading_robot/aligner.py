@@ -105,6 +105,7 @@ class StreamingAligner:
         """Robot supplied this word after the child asked for help."""
         if 0 <= index < len(self.ref):
             self.told.add(index)
+            self.state = self._align()      # the told word counts at once: cursor moves on
 
     def update(self, hyp: list[HypWord]) -> AlignmentState:
         """Re-align with the full current hypothesis (finals + interim tail)."""

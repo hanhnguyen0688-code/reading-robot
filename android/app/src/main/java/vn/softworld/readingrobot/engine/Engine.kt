@@ -167,7 +167,7 @@ class StreamingAligner(val passage: Passage, val cfg: ReadingConfig = ReadingCon
 
     private fun empty() = AlignmentState(ref.indices.map { WordResult(it) }, emptyList(), -1, 0, null, null)
 
-    fun markTold(i: Int) { if (i in ref.indices) told += i }
+    fun markTold(i: Int) { if (i in ref.indices) { told += i; state = align() } }   // cursor moves past the told word at once
 
     fun update(h: List<HypWord>): AlignmentState {
         var x = h.filter { it.norm.isNotEmpty() && it.norm !in Text.FILLERS }
